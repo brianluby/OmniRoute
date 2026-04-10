@@ -121,7 +121,11 @@ export async function isAuthRequired(): Promise<boolean> {
     // The security concern from #151 (password row lost after being set) is handled by the
     // hasPassword flag — if a password WAS set and then somehow lost, the user can use the
     // reset-password CLI tool (bin/reset-password.mjs).
-    if (!settings.password && !process.env.INITIAL_PASSWORD) return false;
+    // If a password was EVER set on this instance, require auth even if the current
+    // password row is missing (DB corruption protection). Fall-open only on fresh
+    // installs that have never had a password configured.
+    if (!settings.password && !process.env.INITIAL_PASSWORD && !settings.passwordEverSet)
+      return false;
     return true;
   } catch (error: any) {
     // On error, require auth (secure by default)

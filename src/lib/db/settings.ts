@@ -82,6 +82,11 @@ export async function updateSettings(updates: Record<string, unknown>) {
     for (const [key, value] of Object.entries(updates)) {
       insert.run(key, JSON.stringify(value));
     }
+    // If a password is being stored, permanently mark this instance as having had a password.
+    // This prevents fail-open access if the password row is later lost due to DB corruption.
+    if ("password" in updates && updates.password) {
+      insert.run("passwordEverSet", JSON.stringify(true));
+    }
   });
   tx();
   backupDbFile("pre-write");

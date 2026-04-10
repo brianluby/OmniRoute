@@ -128,6 +128,8 @@ import {
   isClaudeCodeCompatibleProvider,
   resolveClaudeCodeCompatibleSessionId,
 } from "../services/claudeCodeCompatible.ts";
+import { getCircuitBreaker, CircuitBreakerOpenError } from "@/shared/utils/circuitBreaker";
+import { getProviderProfile } from "../services/accountFallback.ts";
 
 function extractMemoryTextFromResponse(
   response: Record<string, unknown> | null | undefined
@@ -1372,17 +1374,26 @@ export async function handleChatCore({
         let attempts = 0;
         const maxAttempts = provider === "qwen" ? 3 : 1;
 
+        const providerKey = `${provider}:${connectionId || "default"}`;
+        const providerProfile = getProviderProfile(provider);
+        const breaker = getCircuitBreaker(providerKey, {
+          failureThreshold: providerProfile?.circuitBreakerThreshold ?? 5,
+          resetTimeout: providerProfile?.circuitBreakerReset ?? 30000,
+        });
+
         while (attempts < maxAttempts) {
-          const res = await executor.execute({
-            model: modelToCall,
-            body: bodyToSend,
-            stream: upstreamStream,
-            credentials: getExecutionCredentials(),
-            signal: streamController.signal,
-            log,
-            extendedContext,
-            upstreamExtraHeaders: buildUpstreamHeadersForExecute(modelToCall),
-          });
+          const res = await breaker.execute(() =>
+            executor.execute({
+              model: modelToCall,
+              body: bodyToSend,
+              stream: upstreamStream,
+              credentials: getExecutionCredentials(),
+              signal: streamController.signal,
+              log,
+              extendedContext,
+              upstreamExtraHeaders: buildUpstreamHeadersForExecute(modelToCall),
+            })
+          );
 
           // Qwen 429 strict quota backoff (wait 1.5s, 3s and retry)
           if (provider === "qwen" && res.response.status === 429 && attempts < maxAttempts - 1) {
@@ -1483,6 +1494,23 @@ export async function handleChatCore({
     );
   } catch (error) {
     trackPendingRequest(model, provider, connectionId, false);
+
+    if (error instanceof CircuitBreakerOpenError) {
+      return {
+        success: false,
+        response: new Response(
+          JSON.stringify({ error: "Provider temporarily unavailable (circuit open)", provider }),
+          {
+            status: 503,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": getCorsOrigin(),
+            },
+          }
+        ),
+      };
+    }
+
     const failureStatus =
       error.name === "AbortError"
         ? 499
@@ -1539,7 +1567,17 @@ export async function handleChatCore({
     parsedMessage &&
     parsedMessage.toLowerCase().includes("session has expired");
 
-  const streamOptionsOnlyFailed = false; // TODO: properly track stream options failure? (placeholder from existing logic)
+  // streamOptionsOnlyFailed: This flag was intended to distinguish 401/403 responses caused
+  // exclusively by an unsupported stream_options field from genuine auth failures. When true,
+  // the token-refresh retry block below would be skipped (pointless if the token itself is valid).
+  // Implementing this reliably would require inspecting the upstream error body to confirm
+  // stream_options was the rejected field — fragile across provider error formats.
+  // Current behavior (always false): token refresh is always attempted on 401/403, which is
+  // the correct safe default. Worst case: one extra token refresh call that returns the same
+  // token and the retry also fails with 403. Acceptable cost vs. the complexity and risk of
+  // mis-classifying a real auth failure as a stream_options-only failure.
+  // Known limitation: tracked in issue #stream-options-auth-skip (deferred, low priority).
+  const streamOptionsOnlyFailed = false;
 
   // Handle 401/403 (and Qwen explicit expiration) - try token refresh using executor
   if (
