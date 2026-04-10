@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const tempDir = path.join(os.tmpdir(), `omniroute-export-${timestamp}`);
     const zipPath = path.join(os.tmpdir(), `omniroute-full-backup-${timestamp}.zip`);
+    const tarPath = zipPath.replace(".zip", ".tar.gz");
 
     try {
       // Create temp directory
@@ -102,9 +103,7 @@ export async function GET(request: NextRequest) {
       };
       fs.writeFileSync(path.join(tempDir, "metadata.json"), JSON.stringify(metadata, null, 2));
 
-      // Create ZIP using tar (available on all Linux/macOS, and the archiver npm package is not installed)
-      // We'll use Node.js built-in zlib to create a simple tar.gz instead
-      const tarPath = zipPath.replace(".zip", ".tar.gz");
+      // Create tar.gz archive using tar (available on Linux/macOS)
       const tarResult = spawnSync(
         "tar",
         ["-czf", tarPath, "-C", path.dirname(tempDir), path.basename(tempDir)],
@@ -133,7 +132,7 @@ export async function GET(request: NextRequest) {
       // Cleanup on error
       try {
         if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-        if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+        if (fs.existsSync(tarPath)) fs.unlinkSync(tarPath);
       } catch {
         /* ignore cleanup errors */
       }
