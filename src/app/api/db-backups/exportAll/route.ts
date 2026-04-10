@@ -8,7 +8,7 @@ import os from "os";
 
 /**
  * GET /api/db-backups/exportAll
- * Exports the entire database + settings as a ZIP archive
+ * Exports the entire database + settings as a tar.gz archive
  */
 export async function GET(request: NextRequest) {
   const authError = await requireManagementAuth(request);
