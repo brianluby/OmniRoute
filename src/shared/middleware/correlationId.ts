@@ -55,10 +55,11 @@ export function runWithCorrelation(correlationId, fn) {
  * @returns {Promise<Response>}
  */
 export function correlationMiddleware(request, next) {
+  const rawId =
+    request.headers.get("x-request-id") || request.headers.get("x-correlation-id");
+  // Validate: alphanumeric, hyphens, underscores; max 64 chars
   const requestId =
-    request.headers.get("x-request-id") ||
-    request.headers.get("x-correlation-id") ||
-    generateCorrelationId();
+    rawId && /^[a-zA-Z0-9_\-]{1,64}$/.test(rawId) ? rawId : generateCorrelationId();
 
   return runWithCorrelation(requestId, async () => {
     const response = await next();

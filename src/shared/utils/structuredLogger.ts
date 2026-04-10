@@ -183,8 +183,21 @@ export function createLogger(component: string) {
       } catch {}
       writeToFile(entry);
     },
-    child(defaultMeta: Record<string, unknown>) {
-      return createLogger(component);
+    child(childMeta: Record<string, unknown>) {
+      const childLogger = createLogger(component);
+      // Wrap each log method to merge childMeta into every entry
+      const wrap =
+        (fn: (msg: string, meta?: Record<string, unknown>) => void) =>
+        (message: string, meta?: Record<string, unknown>) =>
+          fn(message, { ...childMeta, ...meta });
+      return {
+        ...childLogger,
+        debug: wrap(childLogger.debug.bind(childLogger)),
+        info: wrap(childLogger.info.bind(childLogger)),
+        warn: wrap(childLogger.warn.bind(childLogger)),
+        error: wrap(childLogger.error.bind(childLogger)),
+        fatal: wrap(childLogger.fatal.bind(childLogger)),
+      };
     },
   };
 }

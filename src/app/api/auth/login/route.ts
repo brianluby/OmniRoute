@@ -5,6 +5,7 @@ import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { loginSchema } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
+import { checkLoginLockout, recordLoginFailure, clearLoginAttempts } from "@/lib/db/loginAttempts";
 
 // SECURITY: No hardcoded fallback — JWT_SECRET must be configured.
 if (!process.env.JWT_SECRET) {
@@ -18,7 +19,21 @@ export async function POST(request) {
     if (!process.env.JWT_SECRET) {
       return NextResponse.json(
         { error: "Server misconfigured: JWT_SECRET not set. Contact administrator." },
-        { status: 500 }
+        { status: 500 },
+      );
+    }
+
+    // Brute-force protection: check lockout by IP before processing credentials
+    const ip =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const lockout = checkLoginLockout(ip);
+    if (lockout.locked) {
+      const retryAfterSec = Math.ceil(lockout.retryAfterMs / 1000);
+      return NextResponse.json(
+        { error: "Too many login attempts. Try again later." },
+        { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
       );
     }
 
@@ -45,7 +60,7 @@ export async function POST(request) {
       if (!process.env.INITIAL_PASSWORD) {
         return NextResponse.json(
           { error: "No password configured. Complete onboarding first.", needsSetup: true },
-          { status: 403 }
+          { status: 403 },
         );
       }
       const initialPassword = process.env.INITIAL_PASSWORD;
@@ -53,6 +68,8 @@ export async function POST(request) {
     }
 
     if (isValid) {
+      clearLoginAttempts(ip);
+
       const forceSecureCookie = process.env.AUTH_COOKIE_SECURE === "true";
       const forwardedProtoHeader = request.headers.get("x-forwarded-proto") || "";
       const forwardedProto = forwardedProtoHeader.split(",")[0].trim().toLowerCase();
@@ -75,6 +92,7 @@ export async function POST(request) {
       return NextResponse.json({ success: true });
     }
 
+    recordLoginFailure(ip);
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   } catch (error) {
     console.error("[AUTH] Login failed:", error);
