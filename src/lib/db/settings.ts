@@ -68,6 +68,12 @@ export async function getSettings() {
     db.prepare(
       "INSERT OR REPLACE INTO key_value (namespace, key, value) VALUES ('settings', 'requireLogin', 'true')"
     ).run();
+    // INITIAL_PASSWORD means a password is configured — mark instance as having had a password set
+    // so isAuthRequired() never falls open if the env var is later removed.
+    db.prepare(
+      "INSERT OR IGNORE INTO key_value (namespace, key, value) VALUES ('settings', 'passwordEverSet', 'true')"
+    ).run();
+    settings.passwordEverSet = true;
   }
 
   return settings;
@@ -80,6 +86,8 @@ export async function updateSettings(updates: Record<string, unknown>) {
   );
   const tx = db.transaction(() => {
     for (const [key, value] of Object.entries(updates)) {
+      // passwordEverSet is write-once: once true it must never be overwritten via a generic update.
+      if (key === "passwordEverSet") continue;
       insert.run(key, JSON.stringify(value));
     }
     // If a password is being stored, permanently mark this instance as having had a password.

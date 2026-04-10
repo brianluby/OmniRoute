@@ -19,6 +19,9 @@ services:
       target: runner-cli
     image: omniroute:prod
     restart: unless-stopped
+    # Non-root user (uid 1001). If upgrading from a version that ran as root,
+    # existing volume data may be root-owned. Run once to fix:
+    #   docker run --rm -v omniroute-prod-data:/data alpine chown -R 1001:1001 /data
     user: "1001:1001"
     security_opt:
       - no-new-privileges:true
