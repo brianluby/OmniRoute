@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDbInstance, SQLITE_FILE } from "@/lib/db/core";
+import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
+import { spawnSync } from "node:child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -8,7 +10,9 @@ import os from "os";
  * GET /api/db-backups/exportAll
  * Exports the entire database + settings as a ZIP archive
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
   try {
     if (!SQLITE_FILE) {
       return NextResponse.json(
@@ -100,11 +104,15 @@ export async function GET() {
 
       // Create ZIP using tar (available on all Linux/macOS, and the archiver npm package is not installed)
       // We'll use Node.js built-in zlib to create a simple tar.gz instead
-      const { execSync } = require("node:child_process");
       const tarPath = zipPath.replace(".zip", ".tar.gz");
-      execSync(`tar -czf "${tarPath}" -C "${path.dirname(tempDir)}" "${path.basename(tempDir)}"`, {
-        timeout: 30000,
-      });
+      const tarResult = spawnSync(
+        "tar",
+        ["-czf", tarPath, "-C", path.dirname(tempDir), path.basename(tempDir)],
+        { timeout: 30000, stdio: "pipe" }
+      );
+      if (tarResult.status !== 0) {
+        throw new Error(`tar failed: ${tarResult.stderr?.toString() ?? "unknown error"}`);
+      }
 
       // Read the archive
       const archiveBuffer = fs.readFileSync(tarPath);

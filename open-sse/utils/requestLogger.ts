@@ -1,5 +1,24 @@
 type JsonRecord = Record<string, unknown>;
 
+const SENSITIVE_HEADERS = new Set([
+  "authorization",
+  "x-api-key",
+  "x-goog-api-key",
+  "x-anthropic-api-key",
+  "cookie",
+  "set-cookie",
+]);
+
+function redactHeaders(headers: Record<string, string> | undefined): Record<string, string> {
+  if (!headers) return {};
+  return Object.fromEntries(
+    Object.entries(headers).map(([k, v]) => [
+      k,
+      SENSITIVE_HEADERS.has(k.toLowerCase()) ? "[REDACTED]" : v,
+    ])
+  );
+}
+
 type HeaderInput =
   | Headers
   | Record<string, unknown>
@@ -144,7 +163,7 @@ export async function createRequestLogger(
       payloads.clientRawRequest = {
         timestamp: new Date().toISOString(),
         endpoint,
-        headers: maskSensitiveHeaders(headers),
+        headers: redactHeaders(maskSensitiveHeaders(headers) as Record<string, string>),
         body,
       };
     },
@@ -160,7 +179,7 @@ export async function createRequestLogger(
       payloads.providerRequest = {
         timestamp: new Date().toISOString(),
         url,
-        headers: maskSensitiveHeaders(headers),
+        headers: redactHeaders(maskSensitiveHeaders(headers) as Record<string, string>),
         body,
       };
     },

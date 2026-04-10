@@ -131,6 +131,11 @@ export function isPublicRoute(pathname: string): boolean {
 }
 
 /**
+ * Alias for isPublicRoute — used by middleware.ts.
+ */
+export const isPublicApiRoute = isPublicRoute;
+
+/**
  * Check if authentication is required based on settings.
  * If requireLogin is false AND no password is set, auth is skipped.
  */
