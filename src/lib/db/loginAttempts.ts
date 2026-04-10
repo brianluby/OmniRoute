@@ -8,6 +8,17 @@ function getKey(identifier: string): string {
   return `login:${identifier}`;
 }
 
+/** Safely parse stored attempt timestamps, filtering to within the window. */
+function parseAttempts(raw: string | undefined, windowStart: number): number[] {
+  try {
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((t): t is number => typeof t === "number" && t > windowStart);
+  } catch {
+    return [];
+  }
+}
+
 export function recordLoginFailure(identifier: string): { locked: boolean; attemptsLeft: number } {
   const db = getDbInstance();
   const key = getKey(identifier);
@@ -18,13 +29,11 @@ export function recordLoginFailure(identifier: string): { locked: boolean; attem
     .prepare("SELECT value FROM key_value WHERE namespace = 'login_attempts' AND key = ?")
     .get(key) as { value: string } | undefined;
 
-  const attempts: number[] = row
-    ? JSON.parse(row.value).filter((t: number) => t > windowStart)
-    : [];
+  const attempts = parseAttempts(row?.value, windowStart);
   attempts.push(now);
 
   db.prepare(
-    "INSERT OR REPLACE INTO key_value (namespace, key, value) VALUES ('login_attempts', ?, ?)",
+    "INSERT OR REPLACE INTO key_value (namespace, key, value) VALUES ('login_attempts', ?, ?)"
   ).run(key, JSON.stringify(attempts));
 
   const locked = attempts.length >= MAX_ATTEMPTS;
@@ -43,7 +52,13 @@ export function checkLoginLockout(identifier: string): { locked: boolean; retryA
 
   if (!row) return { locked: false, retryAfterMs: 0 };
 
-  const attempts: number[] = JSON.parse(row.value).filter((t: number) => t > windowStart);
+  const attempts = parseAttempts(row.value, windowStart);
+
+  // All timestamps expired — prune the stale row
+  if (attempts.length === 0) {
+    db.prepare("DELETE FROM key_value WHERE namespace = 'login_attempts' AND key = ?").run(key);
+    return { locked: false, retryAfterMs: 0 };
+  }
 
   if (attempts.length < MAX_ATTEMPTS) return { locked: false, retryAfterMs: 0 };
 

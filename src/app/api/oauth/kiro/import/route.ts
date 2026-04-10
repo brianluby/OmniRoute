@@ -75,7 +75,9 @@ export async function POST(request: any) {
       },
     });
   } catch (error: any) {
-    console.error("[ROUTE_ERROR]", error);
+    // Redact full error in OAuth path — may contain token-adjacent details
+    const safeError = error instanceof Error ? { name: error.name } : { name: "UnknownError" };
+    console.error("[ROUTE_ERROR]", safeError);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

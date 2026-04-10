@@ -1,7 +1,7 @@
 import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 import { storeGeminiThoughtSignature } from "../../services/geminiThoughtSignatureStore.ts";
-import crypto from "crypto";
+import { randomUUID } from "crypto";
 
 // Convert Gemini response chunk to OpenAI format
 export function geminiToOpenAIResponse(chunk, state) {
@@ -112,7 +112,7 @@ export function geminiToOpenAIResponse(chunk, state) {
           const toolCallIndex = state.functionIndex++;
 
           const toolCall = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             index: toolCallIndex,
             type: "function",
             function: {
@@ -169,7 +169,7 @@ export function geminiToOpenAIResponse(chunk, state) {
         const toolCallIndex = state.functionIndex++;
 
         const toolCall = {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           index: toolCallIndex,
           type: "function",
           function: {

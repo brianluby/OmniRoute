@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { loginSchema } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 import { checkLoginLockout, recordLoginFailure, clearLoginAttempts } from "@/lib/db/loginAttempts";
+import { getClientIpFromRequest } from "@/lib/ipUtils";
 
 // SECURITY: No hardcoded fallback — JWT_SECRET must be configured.
 if (!process.env.JWT_SECRET) {
@@ -19,21 +20,19 @@ export async function POST(request) {
     if (!process.env.JWT_SECRET) {
       return NextResponse.json(
         { error: "Server misconfigured: JWT_SECRET not set. Contact administrator." },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
     // Brute-force protection: check lockout by IP before processing credentials
-    const ip =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      "unknown";
+    // Use getClientIpFromRequest to handle CSV x-forwarded-for and Cloudflare headers
+    const ip = getClientIpFromRequest(request);
     const lockout = checkLoginLockout(ip);
     if (lockout.locked) {
       const retryAfterSec = Math.ceil(lockout.retryAfterMs / 1000);
       return NextResponse.json(
         { error: "Too many login attempts. Try again later." },
-        { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+        { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
       );
     }
 
@@ -60,7 +59,7 @@ export async function POST(request) {
       if (!process.env.INITIAL_PASSWORD) {
         return NextResponse.json(
           { error: "No password configured. Complete onboarding first.", needsSetup: true },
-          { status: 403 },
+          { status: 403 }
         );
       }
       const initialPassword = process.env.INITIAL_PASSWORD;

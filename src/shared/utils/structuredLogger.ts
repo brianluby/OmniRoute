@@ -197,6 +197,10 @@ export function createLogger(component: string) {
         warn: wrap(childLogger.warn.bind(childLogger)),
         error: wrap(childLogger.error.bind(childLogger)),
         fatal: wrap(childLogger.fatal.bind(childLogger)),
+        // Chained children accumulate parent meta so it is never dropped
+        child(grandChildMeta: Record<string, unknown>) {
+          return childLogger.child({ ...childMeta, ...grandChildMeta });
+        },
       };
     },
   };
