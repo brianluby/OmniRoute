@@ -1,7 +1,7 @@
 /**
  * Public API routes that are accessible without authentication.
- * This module is intentionally Edge-runtime safe — no next/headers or DB imports.
- * Used by both src/middleware.ts (Edge) and src/shared/utils/apiAuth.ts (Node).
+ * This module is intentionally runtime-safe — no next/headers or DB imports.
+ * Used by src/proxy.ts and src/shared/utils/apiAuth.ts.
  */
 
 /**
