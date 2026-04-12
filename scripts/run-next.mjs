@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { resolveRuntimePorts, withRuntimePortEnv } from "./runtime-env.mjs";
 import { bootstrapEnv } from "./bootstrap-env.mjs";
+import { movePath } from "./build-next-isolated.mjs";
 
 const mode = process.argv[2] === "start" ? "start" : "dev";
 const projectRoot = process.cwd();
@@ -25,29 +26,7 @@ async function shouldMoveLegacyAppDir() {
   return (await exists(legacyAppDir)) && (await exists(srcAppDir));
 }
 
-async function movePath(sourcePath, destinationPath) {
-  try {
-    await fs.rename(sourcePath, destinationPath);
-  } catch (error) {
-    if (error?.code !== "EXDEV") {
-      throw error;
-    }
-
-    await fs.cp(sourcePath, destinationPath, {
-      recursive: true,
-      preserveTimestamps: true,
-      force: false,
-      errorOnExist: true,
-    });
-    await fs.rm(sourcePath, { recursive: true, force: true });
-  }
-}
-
-let movedLegacyAppDir = false;
-
 async function restoreLegacyAppDir() {
-  if (!movedLegacyAppDir) return;
-
   if ((await exists(backupDir)) && !(await exists(legacyAppDir))) {
     await movePath(backupDir, legacyAppDir);
   }
@@ -74,22 +53,24 @@ function runChild(command, args, options) {
   });
 }
 
+let movedLegacyApp = false;
+
 try {
   if (mode === "dev" && (await shouldMoveLegacyAppDir())) {
     await movePath(legacyAppDir, backupDir);
-    movedLegacyAppDir = true;
+    movedLegacyApp = true;
     console.log("[run-next] Temporarily moved legacy app/ out of the way for dev mode");
   }
 
-  // Load .env / server.env first so PORT / DASHBOARD_PORT from files affect --port below.
   const env = bootstrapEnv();
   const runtimePorts = resolveRuntimePorts(env);
   const { dashboardPort } = runtimePorts;
 
   const args = ["./node_modules/next/dist/bin/next", mode, "--port", String(dashboardPort)];
 
-  // Default to Turbopack in dev. Opt into webpack only when explicitly requested.
-  // Must read merged `env` from bootstrap — .env is not applied to process.env in the launcher.
+  // Default: use Turbopack in dev. This codebase uses Tailwind v4 / CSS imports that compile
+  // correctly under Turbopack, while the webpack dev path stalls on src/app/globals.css.
+  // Set OMNIROUTE_USE_WEBPACK=1 in .env only if you explicitly need the legacy dev compiler.
   if (mode === "dev" && env.OMNIROUTE_USE_WEBPACK === "1") {
     args.splice(2, 0, "--webpack");
   }
@@ -99,7 +80,13 @@ try {
     env: withRuntimePortEnv(env, runtimePorts),
   });
 
-  await restoreLegacyAppDir();
+  if (movedLegacyApp) {
+    try {
+      await restoreLegacyAppDir();
+    } catch (restoreError) {
+      console.error("[run-next] Failed to restore legacy app dir:", restoreError);
+    }
+  }
 
   if (result.signal) {
     process.kill(process.pid, result.signal);
@@ -107,14 +94,18 @@ try {
 
   process.exit(result.code);
 } catch (error) {
-  try {
-    await restoreLegacyAppDir();
-  } catch (restoreError) {
-    console.error(
-      "[run-next] Failed to restore legacy app/ directory after startup error:",
-      restoreError
-    );
+  console.error("[run-next] Failed to start Next.js:", error);
+
+  if (movedLegacyApp) {
+    try {
+      await restoreLegacyAppDir();
+    } catch (restoreError) {
+      console.error(
+        "[run-next] Failed to restore legacy app dir after startup failure:",
+        restoreError
+      );
+    }
   }
 
-  throw error;
+  process.exit(1);
 }
