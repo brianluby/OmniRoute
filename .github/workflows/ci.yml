@@ -67,7 +67,7 @@ jobs:
 
       - name: Upload result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: i18n-${{ matrix.lang }}
           path: result.txt
@@ -194,7 +194,7 @@ jobs:
           cat coverage/coverage-report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: |
@@ -218,7 +218,7 @@ jobs:
       - name: Download coverage artifact
         if: ${{ needs.test-coverage.result != 'cancelled' }}
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-report
           path: .
@@ -247,7 +247,7 @@ jobs:
               echo "This PR changes production code in \`src/\`, \`open-sse/\`, \`electron/\`, or \`bin/\` without accompanying automated tests."
             fi
           } > .artifacts/pr-coverage-comment.md
-      - uses: actions/github-script@v8
+      - uses: actions/github-script@v9
         with:
           script: |
             const fs = require("fs");
@@ -358,7 +358,7 @@ jobs:
     steps:
       - name: Download i18n results
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: i18n-*
           path: results

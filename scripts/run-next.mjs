@@ -62,7 +62,6 @@ try {
     console.log("[run-next] Temporarily moved legacy app/ out of the way for dev mode");
   }
 
-  // Load .env / server.env first so PORT / DASHBOARD_PORT from files affect --port below.
   const env = bootstrapEnv();
   const runtimePorts = resolveRuntimePorts(env);
   const { dashboardPort } = runtimePorts;
@@ -72,7 +71,6 @@ try {
   // Default: use Turbopack in dev. This codebase uses Tailwind v4 / CSS imports that compile
   // correctly under Turbopack, while the webpack dev path stalls on src/app/globals.css.
   // Set OMNIROUTE_USE_WEBPACK=1 in .env only if you explicitly need the legacy dev compiler.
-  // Must read merged `env` from bootstrap — .env is not applied to process.env in the launcher.
   if (mode === "dev" && env.OMNIROUTE_USE_WEBPACK === "1") {
     args.splice(2, 0, "--webpack");
   }

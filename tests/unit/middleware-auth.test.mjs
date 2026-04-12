@@ -2,7 +2,7 @@ import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 
 /**
- * Tests for public API route matching used by src/proxy.ts.
+ * Tests for public API route matching used by shared auth/runtime entrypoints.
  * These are unit-level tests around the shared allowlist helper.
  */
 

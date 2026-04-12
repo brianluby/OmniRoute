@@ -11,11 +11,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(__dirname, "../../bin/reset-password.mjs");
 
 /** Run the CLI with piped stdin lines, return { code, stdout, stderr } */
-function runCLI(inputs) {
+function runCLI(inputs, envOverrides = {}) {
   return new Promise((res) => {
     const proc = spawn("node", [SCRIPT], {
       stdio: "pipe",
-      env: { ...process.env },
+      env: { ...process.env, ...envOverrides },
     });
     let stdout = "";
     let stderr = "";
@@ -34,12 +34,15 @@ function runCLI(inputs) {
       setImmediate(() => writeNext(lines.slice(1)));
     };
     writeNext(inputs);
-    proc.on("close", (code) => res({ code, stdout, stderr }));
-    // Safety timeout
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       proc.kill();
       res({ code: -1, stdout, stderr: stderr + "\n[TIMEOUT]" });
     }, 5000);
+    timeout.unref?.();
+    proc.on("close", (code) => {
+      clearTimeout(timeout);
+      res({ code, stdout, stderr });
+    });
   });
 }
 
@@ -48,7 +51,7 @@ test("reset-password rejects password shorter than 12 chars", async () => {
   // rather than requiring a full DB setup
   const tempDir = mkdtempSync(join(tmpdir(), "omniroute-pw-test-"));
   try {
-    const result = await runCLI(["short"]);
+    const result = await runCLI(["short"], { DATA_DIR: tempDir });
     // Script exits 1 either because DB not found (no DB) or password too short
     assert.notEqual(result.code, 0, "should exit non-zero for short password");
   } finally {
@@ -56,21 +59,16 @@ test("reset-password rejects password shorter than 12 chars", async () => {
   }
 });
 
-test(
-  "reset-password exits non-zero when DATA_DIR has no database",
-  async () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "omniroute-pw-test-empty-"));
-    try {
-      const result = await runCLI(["ValidPassword123"]);
-      assert.equal(result.code, 1, "should exit 1 when DB not found");
-      assert.ok(
-        result.stderr.includes("Database not found") ||
-          result.stdout.includes("Database not found"),
-        `Expected 'Database not found' in output, got stderr: ${result.stderr} stdout: ${result.stdout}`
-      );
-    } finally {
-      rmSync(tempDir, { recursive: true, force: true });
-    }
-  },
-  { env: {} }
-);
+test("reset-password exits non-zero when DATA_DIR has no database", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "omniroute-pw-test-empty-"));
+  try {
+    const result = await runCLI(["ValidPassword123"], { DATA_DIR: tempDir });
+    assert.equal(result.code, 1, "should exit 1 when DB not found");
+    assert.ok(
+      result.stderr.includes("Database not found") || result.stdout.includes("Database not found"),
+      `Expected 'Database not found' in output, got stderr: ${result.stderr} stdout: ${result.stdout}`
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
