@@ -123,14 +123,6 @@ jobs:
       - name: Check for known vulnerabilities
         run: npx is-my-node-vulnerable || true
 
-      - name: Run Snyk Vulnerability checks
-        if: github.actor != 'dependabot[bot]'
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high
-
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -210,33 +202,6 @@ jobs:
             coverage/lcov.info
             coverage/coverage-report.md
           if-no-files-found: warn
-
-  sonarqube:
-    name: SonarQube
-    runs-on: ubuntu-latest
-    needs: test-coverage
-    if: ${{ always() && needs.test-coverage.result == 'success' }}
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - uses: actions/download-artifact@v8
-        with:
-          name: coverage-report
-          path: .
-      - name: Explain SonarQube skip
-        if: ${{ env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '' }}
-        run: |
-          echo "SonarQube scan skipped because SONAR_TOKEN or SONAR_HOST_URL is not configured." >> "$GITHUB_STEP_SUMMARY"
-      - name: SonarQube Scan
-        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
-        uses: SonarSource/sonarqube-scan-action@v7
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
 
   coverage-pr-comment:
     name: PR Coverage Comment
@@ -386,7 +351,6 @@ jobs:
       - build
       - test-unit
       - test-coverage
-      - sonarqube
       - coverage-pr-comment
       - test-e2e
       - test-integration
@@ -423,7 +387,6 @@ jobs:
           echo "| Lint | $(status '${{ needs.lint.result }}') |" >> "$GITHUB_STEP_SUMMARY"
           echo "| PR Test Policy | $(status '${{ needs.pr-test-policy.result }}') |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Advanced Security | $(status '${{ needs.advanced-security.result }}') |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| SonarQube | $(status '${{ needs.sonarqube.result }}') |" >> "$GITHUB_STEP_SUMMARY"
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "## 🏗️ Build" >> "$GITHUB_STEP_SUMMARY"

@@ -61,6 +61,8 @@ CMD ["node", "run-standalone.mjs"]
 
 FROM runner-base AS runner-cli
 
+USER root
+
 # Install system dependencies required by openclaw (git+ssh references).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends git ca-certificates docker.io docker-compose \

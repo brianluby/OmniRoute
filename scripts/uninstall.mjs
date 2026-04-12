@@ -5,9 +5,7 @@ import { execSync } from "child_process";
 
 const args = process.argv.slice(2);
 const fullUninstall = args.includes("--full");
-const uninstallAlreadyInProgress =
-  process.env.OMNIROUTE_SKIP_UNINSTALL_HOOK === "1" ||
-  process.env.npm_lifecycle_event === "uninstall";
+const uninstallAlreadyInProgress = process.env.OMNIROUTE_SKIP_UNINSTALL_HOOK === "1";
 
 console.log("🛑 OmniRoute Uninstaller");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
