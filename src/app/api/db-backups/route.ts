@@ -2,16 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { listDbBackups, restoreDbBackup, backupDbFile } from "@/lib/localDb";
 import { dbBackupRestoreSchema } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
-import { isAuthenticated } from "@/shared/utils/apiAuth";
+import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 
 /**
  * PUT /api/db-backups — Trigger a manual backup snapshot.
  * Security: Requires admin authentication.
  */
 export async function PUT(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
 
   try {
     const result = backupDbFile("manual");
@@ -30,9 +29,8 @@ export async function PUT(request: NextRequest) {
  * Security: Requires admin authentication.
  */
 export async function GET(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
 
   try {
     const backups = await listDbBackups();
@@ -49,9 +47,8 @@ export async function GET(request: NextRequest) {
  * Security: Requires admin authentication.
  */
 export async function POST(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
 
   let rawBody;
   try {

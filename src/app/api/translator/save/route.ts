@@ -3,12 +3,11 @@ import fs from "fs";
 import path from "path";
 import { translatorSaveSchema } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
-import { isAuthenticated } from "@/shared/utils/apiAuth";
+import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 
 export async function POST(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
 
   let rawBody;
   try {
