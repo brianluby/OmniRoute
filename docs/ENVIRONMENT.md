@@ -63,12 +63,12 @@ echo "INITIAL_PASSWORD=$(openssl rand -base64 16)"
 
 OmniRoute uses **SQLite** (via `better-sqlite3`) for all persistence. These variables control data location, encryption, and lifecycle.
 
-| Variable                         | Default              | Source File                                     | Description                                                                                                                                   |
-| -------------------------------- | -------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATA_DIR`                       | `~/.omniroute/`      | `src/lib/db/core.ts`                            | Root directory for SQLite DB, backups, and data files. Override for Docker volumes or custom paths.                                           |
-| `STORAGE_ENCRYPTION_KEY`         | _(empty = disabled)_ | `src/lib/db/encryption.ts`                      | AES-256-GCM key for field-level encryption of sensitive values (for example API keys/tokens) in SQLite. Generate with `openssl rand -hex 32`. |
-| `STORAGE_ENCRYPTION_KEY_VERSION` | `v1`                 | `scripts/bootstrap-env.mjs`, `electron/main.js` | Version label for the encryption key. Increment when performing key rotation to support decryption of old backups.                            |
-| `DISABLE_SQLITE_AUTO_BACKUP`     | `false`              | `src/lib/db/backup.ts`                          | When `true`, skips the automatic database backup that runs before migrations on every startup.                                                |
+| Variable                         | Default              | Source File                                     | Description                                                                                                        |
+| -------------------------------- | -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DATA_DIR`                       | `~/.omniroute/`      | `src/lib/db/core.ts`                            | Root directory for SQLite DB, backups, and data files. Override for Docker volumes or custom paths.                |
+| `STORAGE_ENCRYPTION_KEY`         | _(empty = disabled)_ | `src/lib/db/encryption.ts`                      | AES key for full SQLite database encryption at rest. Generate with `openssl rand -hex 32`.                         |
+| `STORAGE_ENCRYPTION_KEY_VERSION` | `v1`                 | `scripts/bootstrap-env.mjs`, `electron/main.js` | Version label for the encryption key. Increment when performing key rotation to support decryption of old backups. |
+| `DISABLE_SQLITE_AUTO_BACKUP`     | `false`              | `src/lib/db/backup.ts`                          | When `true`, skips the automatic database backup that runs before migrations on every startup.                     |
 
 ### Scenarios
 
@@ -108,7 +108,7 @@ OmniRoute uses **SQLite** (via `better-sqlite3`) for all persistence. These vari
 │  API_PORT=20129                                                             │
 │  API_HOST=0.0.0.0                                                           │
 │  → Dashboard: http://localhost:20128                                        │
-│  → API:       http://localhost:20129/v1/chat/completions                   │
+│  → API:       http://0.0.0.0:20129/v1/chat/completions                     │
 │  Use case: Expose API to LAN while restricting Dashboard to localhost.      │
 └─────────────────────────────────────────────────────────────────────────────┘
 

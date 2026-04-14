@@ -337,19 +337,18 @@ These endpoints mirror Gemini's API format for clients that expect native Gemini
 POST /api/system/env/repair
 Content-Type: application/json
 
-{}
+{
+  "provider": "claude-code"
+}
 ```
 
-Repairs missing or corrupted OAuth environment variables by syncing missing OAuth defaults from `.env.example`. Returns:
+Repairs missing or corrupted OAuth environment variables for a specific provider. Returns:
 
 ```json
 {
   "success": true,
-  "backupPath": "/home/user/.omniroute/backups/env-repair-2026-04-11.bak",
-  "created": false,
-  "added": 2,
-  "missingCount": 2,
-  "missingKeys": ["CLAUDE_CODE_OAUTH_CLIENT_ID", "CLAUDE_CODE_OAUTH_CLIENT_SECRET"]
+  "repaired": ["CLAUDE_CODE_OAUTH_CLIENT_ID", "CLAUDE_CODE_OAUTH_CLIENT_SECRET"],
+  "backupPath": "/home/user/.omniroute/backups/env-repair-2026-04-11.bak"
 }
 ```
 

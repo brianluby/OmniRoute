@@ -1,9 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { openaiToClaudeRequest } = await import(
-  "../../open-sse/translator/request/openai-to-claude.ts"
-);
+const { openaiToClaudeRequest } =
+  await import("../../open-sse/translator/request/openai-to-claude.ts");
 
 test("tool-only assistant message with content:null does not produce empty content block", () => {
   const input = {
@@ -37,12 +36,12 @@ test("tool-only assistant message with content:null does not produce empty conte
   // Content should not contain an empty text block
   if (Array.isArray(assistantMsg.content)) {
     const emptyTextBlocks = assistantMsg.content.filter(
-      (b) => b.type === "text" && (b.text === "" || b.text === null || b.text === undefined),
+      (b) => b.type === "text" && (b.text === "" || b.text === null || b.text === undefined)
     );
     assert.equal(
       emptyTextBlocks.length,
       0,
-      `Should not have empty text blocks, got: ${JSON.stringify(assistantMsg.content)}`,
+      `Should not have empty text blocks, got: ${JSON.stringify(assistantMsg.content)}`
     );
   }
 });

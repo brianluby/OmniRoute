@@ -481,6 +481,8 @@ export async function handleChatCore({
   comboName,
   comboStrategy = null,
   isCombo = false,
+  comboStepId = null,
+  comboExecutionKey = null,
   disableEmergencyFallback = false,
 }) {
   let { provider, model, extendedContext } = modelInfo;
@@ -748,6 +750,8 @@ export async function handleChatCore({
       sourceFormat,
       targetFormat,
       comboName,
+      comboStepId,
+      comboExecutionKey,
       apiKeyId: apiKeyInfo?.id || null,
       apiKeyName: apiKeyInfo?.name || null,
       noLog: noLogEnabled,
@@ -955,7 +959,10 @@ export async function handleChatCore({
   let translatedBody = body;
   const isClaudePassthrough = sourceFormat === FORMATS.CLAUDE && targetFormat === FORMATS.CLAUDE;
   const isClaudeCodeCompatible = isClaudeCodeCompatibleProvider(provider);
-  const upstreamStream = stream || isClaudeCodeCompatible;
+  // Respect the client's explicit non-streaming intent for CC-compatible providers.
+  // Most upstreams can answer JSON directly; the SSE->JSON fallback remains as a
+  // compatibility path when an upstream still responds with event-stream.
+  const upstreamStream = stream;
   let ccSessionId: string | null = null;
 
   // Determine if we should preserve client-side cache_control headers
@@ -1355,6 +1362,15 @@ export async function handleChatCore({
   const dedupEnabled = shouldDeduplicate(dedupRequestBody);
   const dedupHash = dedupEnabled ? computeRequestHash(dedupRequestBody) : null;
 
+  // Hoist breaker outside executeProviderRequest so the refresh-retry path (below) can also route
+  // through it, keeping failure counts and circuit state consistent across all execution paths.
+  const providerKey = `${provider}:${connectionId || "default"}`;
+  const providerProfile = getProviderProfile(provider);
+  const breaker = getCircuitBreaker(providerKey, {
+    failureThreshold: providerProfile?.circuitBreakerThreshold ?? 5,
+    resetTimeout: providerProfile?.circuitBreakerReset ?? 30000,
+  });
+
   const executeProviderRequest = async (modelToCall = effectiveModel, allowDedup = false) => {
     const execute = async () => {
       let bodyToSend =
@@ -1376,15 +1392,6 @@ export async function handleChatCore({
           bodyToSend = { ...bodyToSend, prompt_cache_key: cacheKey };
         }
       }
-
-      // Hoist breaker outside withRateLimit so the refresh-retry path (below) can also route
-      // through it, keeping failure counts and circuit state consistent across all execution paths.
-      const providerKey = `${provider}:${connectionId || "default"}`;
-      const providerProfile = getProviderProfile(provider);
-      const breaker = getCircuitBreaker(providerKey, {
-        failureThreshold: providerProfile?.circuitBreakerThreshold ?? 5,
-        resetTimeout: providerProfile?.circuitBreakerReset ?? 30000,
-      });
 
       const rawResult = await withRateLimit(provider, connectionId, modelToCall, async () => {
         let attempts = 0;
@@ -1599,16 +1606,8 @@ export async function handleChatCore({
     parsedMessage &&
     parsedMessage.toLowerCase().includes("session has expired");
 
-  // streamOptionsOnlyFailed: This flag was intended to distinguish 401/403 responses caused
-  // exclusively by an unsupported stream_options field from genuine auth failures. When true,
-  // the token-refresh retry block below would be skipped (pointless if the token itself is valid).
-  // Implementing this reliably would require inspecting the upstream error body to confirm
-  // stream_options was the rejected field — fragile across provider error formats.
-  // Current behavior (always false): token refresh is always attempted on 401/403, which is
-  // the correct safe default. Worst case: one extra token refresh call that returns the same
-  // token and the retry also fails with 403. Acceptable cost vs. the complexity and risk of
-  // mis-classifying a real auth failure as a stream_options-only failure.
-  // Known limitation: tracked in issue #stream-options-auth-skip (deferred, low priority).
+  // Deferred (#stream-options-auth-skip): always attempt token refresh on 401/403.
+  // Distinguishing stream_options rejections from real auth failures is fragile across providers.
   const streamOptionsOnlyFailed = false;
 
   // Handle 401/403 (and Qwen explicit expiration) - try token refresh using executor

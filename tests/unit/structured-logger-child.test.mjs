@@ -57,7 +57,16 @@ test("child meta does not bleed into sibling loggers", () => {
   const outputA = captureConsole(() => childA.info("from A"));
   const outputB = captureConsole(() => childB.info("from B"));
 
-  assert.ok(outputA.includes("user-A"), `user-A meta should appear in childA output, got: ${outputA}`);
-  assert.ok(!outputB.includes("user-A"), `user-A meta should not appear in childB output, got: ${outputB}`);
-  assert.ok(outputB.includes("user-B"), `user-B meta should appear in childB output, got: ${outputB}`);
+  assert.ok(
+    outputA.includes("user-A"),
+    `user-A meta should appear in childA output, got: ${outputA}`
+  );
+  assert.ok(
+    !outputB.includes("user-A"),
+    `user-A meta should not appear in childB output, got: ${outputB}`
+  );
+  assert.ok(
+    outputB.includes("user-B"),
+    `user-B meta should appear in childB output, got: ${outputB}`
+  );
 });

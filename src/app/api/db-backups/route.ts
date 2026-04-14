@@ -1,12 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { listDbBackups, restoreDbBackup, backupDbFile } from "@/lib/localDb";
 import { dbBackupRestoreSchema } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
+import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 
 /**
  * PUT /api/db-backups — Trigger a manual backup snapshot.
+ * Security: Requires admin authentication.
  */
-export async function PUT() {
+export async function PUT(request: NextRequest) {
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
+
   try {
     const result = backupDbFile("manual");
     if (!result) {
@@ -21,8 +26,12 @@ export async function PUT() {
 
 /**
  * GET /api/db-backups — List available database backups.
+ * Security: Requires admin authentication.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
+
   try {
     const backups = await listDbBackups();
     return NextResponse.json({ backups });
@@ -35,8 +44,12 @@ export async function GET() {
 /**
  * POST /api/db-backups — Restore a specific backup.
  * Body: { backupId: "db_2026-02-11T14-00-00-000Z_pre-write.json" }
+ * Security: Requires admin authentication.
  */
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+  const authError = await requireManagementAuth(request);
+  if (authError) return authError;
+
   let rawBody;
   try {
     rawBody = await request.json();

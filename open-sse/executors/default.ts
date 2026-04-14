@@ -1,4 +1,4 @@
-import { BaseExecutor, sanitizePath } from "./base.ts";
+import { BaseExecutor, sanitizedChatPath } from "./base.ts";
 import { PROVIDERS, OAUTH_ENDPOINTS } from "../config/constants.ts";
 import { getAccessToken } from "../services/tokenRefresh.ts";
 import { getRotatingApiKey } from "../services/apiKeyRotator.ts";
@@ -42,15 +42,6 @@ function normalizeSnowflakeChatUrl(baseUrl) {
 function normalizeGigachatChatUrl(baseUrl) {
   const normalized = normalizeBaseUrl(baseUrl).replace(/\/chat\/completions$/, "");
   return `${normalized}/chat/completions`;
-}
-
-function sanitizedChatPath(psd: unknown): string | null {
-  const raw =
-    typeof (psd as Record<string, unknown>)?.chatPath === "string" &&
-    (psd as Record<string, unknown>).chatPath
-      ? ((psd as Record<string, unknown>).chatPath as string)
-      : null;
-  return raw && sanitizePath(raw) ? raw : null;
 }
 
 export class DefaultExecutor extends BaseExecutor {
@@ -188,7 +179,7 @@ export class DefaultExecutor extends BaseExecutor {
         }
     }
 
-    if (stream) headers["Accept"] = "text/event-stream";
+    headers["Accept"] = stream ? "text/event-stream" : "application/json";
 
     // Qwen header cleanup: Remove X-Dashscope-* headers if using an API key (DashScope compatible mode).
     // If using OAuth (Qwen Code), we MUST keep them for portal.qwen.ai to accept the request.

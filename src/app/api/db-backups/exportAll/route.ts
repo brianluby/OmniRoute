@@ -5,14 +5,15 @@ import { spawnSync } from "node:child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
-
 /**
  * GET /api/db-backups/exportAll
  * Exports the entire database + settings as a tar.gz archive
+ * Security: Requires admin authentication.
  */
 export async function GET(request: NextRequest) {
   const authError = await requireManagementAuth(request);
   if (authError) return authError;
+
   try {
     if (!SQLITE_FILE) {
       return NextResponse.json(

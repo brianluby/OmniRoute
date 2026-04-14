@@ -6,7 +6,8 @@ function getApiKeySecret(): string {
   const secret = process.env.API_KEY_SECRET;
   if (!secret || secret.trim() === "") {
     throw new Error(
-      "API_KEY_SECRET environment variable is required. Generate one with: openssl rand -hex 32"
+      "API_KEY_SECRET is required for API key CRC operations. " +
+        "The startup validator (instrumentation-node.ts) should have set this automatically."
     );
   }
   return secret;
