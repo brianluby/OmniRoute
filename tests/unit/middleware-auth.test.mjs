@@ -2,8 +2,8 @@ import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 
 /**
- * Tests for src/middleware.ts auth guard behavior.
- * These are unit-level tests using mocked Next.js request/response objects.
+ * Tests for public API route matching used by shared auth/runtime entrypoints.
+ * These are unit-level tests around the shared allowlist helper.
  */
 
 // Helper: create a minimal mock NextRequest

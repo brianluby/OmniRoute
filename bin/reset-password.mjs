@@ -72,8 +72,10 @@ async function main() {
 
   const password = await ask("Enter new password (min 12 chars): ");
 
-  if (!password || password.length < 12) {
-    console.error("\n❌ Password must be at least 12 characters.\n");
+  if (!password || password.length < 12 || !/\S/.test(password)) {
+    console.error(
+      "\n❌ Password must be at least 12 characters and contain a non-whitespace character.\n"
+    );
     db.close();
     rl.close();
     process.exit(1);
